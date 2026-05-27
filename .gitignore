@@ -1,6 +1,5 @@
-/*
-
-!app.py
-!requirements.txt
-!.gitignore
-!memes/
+__pycache__/
+*.py[cod]
+.env
+joke_model/
+optimizer.pt

@@ -98,22 +98,26 @@ elif st.session_state.step == 2:
         else:
             st.error("No input provided")
 
-    if st.session_state.analyzed:
-        score = st.session_state.score
-        level = min(int(score * 5) + 1, 5)
-        st.write(f"Final Score: {score:.2f}")
-
-        if st.session_state.style != "Number Only":
-            asset_type = "GIF" if st.session_state.style == "GIF" else "IMAGE"
-            path = ASSETS[asset_type][f"level{level}"]
-            if os.path.exists(path):
-                st.image(path)
-
-        col1, col2 = st.columns(2)
-        if col1.button("Save as Joke"):
-            save_to_database(st.session_state.final_text, st.session_state.input_lang, 1)
-        if col2.button("Save as Serious"):
-            save_to_database(st.session_state.final_text, st.session_state.input_lang, 0)
+    if st.session_state.method == "Voice":
+        audio = st.audio_input("Record your voice")
+        if audio:
+            _, _, whisper_model, _ = load_models()
+            
+            # Faylı mütləq tam yol ilə saxlayırıq
+            temp_path = os.path.join(os.getcwd(), "temp_audio.wav")
+            with open(temp_path, "wb") as f:
+                f.write(audio.getbuffer())
+            
+            try:
+                # Transcribe funksiyasına tam yolu veririk
+                result = whisper_model.transcribe(temp_path)
+                st.session_state.final_text = result["text"]
+                st.info(f"Detected Text: {st.session_state.final_text}")
+            except Exception as e:
+                st.error(f"Whisper Error: {e}")
+            finally:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
 
     if st.button("Restart"):
         for key in list(st.session_state.keys()): del st.session_state[key]
