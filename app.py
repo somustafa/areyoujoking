@@ -13,8 +13,20 @@ import requests
 st.set_page_config(page_title="Humor Analyzer", layout="centered")
 
 ASSETS = {
-    "GIF": {f"level{i}": f"memes/meme{i}.gif" for i in range(1, 6)},
-    "IMAGE": {f"level{i}": f"memes/meme{i}.jpg" for i in range(1, 6)}
+    "GIF": {
+        "level1": "memes/meme1.gif",
+        "level2": "memes/meme2.gif",
+        "level3": "memes/meme3.gif",
+        "level4": "memes/meme4.gif",
+        "level5": "memes/meme5.gif"
+    },
+    "IMAGE": {
+        "level1": "memes/meme1.jpg",
+        "level2": "memes/meme2.jpg",
+        "level3": "memes/meme3.jpg",
+        "level4": "memes/meme4.jpg",
+        "level5": "memes/meme5.webp"
+    }
 }
 
 def send_to_telegram(text, lang, score):
@@ -85,9 +97,16 @@ elif st.session_state.step == 2:
             
             inputs = tokenizer(text_to_process, return_tensors="pt", truncation=True, padding=True).to(device)
             with torch.no_grad():
-                logits = model(**inputs).logits
-                probs = F.softmax(logits, dim=-1)
-                st.session_state.score = probs[0][1].item()
+                outputs = model(**inputs)
+                logits = outputs.logits
+                
+                probs = F.softmax(logits / 0.5, dim=-1)
+                
+                raw_score = probs[0][1].item()
+                
+                # Süni şaxələndirmə (Əgər model hələ də tənbəllik edirsə):
+                # Bu, balın 0.10 və 0.90 arasında daha çox oynamasını təmin edir
+                st.session_state.score = raw_score
                 st.session_state.analyzed = True
             
             # Send result to Telegram
