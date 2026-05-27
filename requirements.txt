@@ -2,7 +2,6 @@ streamlit
 torch
 transformers
 openai-whisper
-deep-translator
 pandas
-python-dotenv
+deep-translator
 requests
