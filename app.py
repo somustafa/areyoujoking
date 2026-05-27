@@ -99,24 +99,26 @@ elif st.session_state.step == 2:
             st.error("No input provided")
 
     if st.session_state.method == "Voice":
-        audio = st.audio_input("Record your voice")
+        audio = st.audio_input("Record your voice", key="voice_recorder")
         if audio:
             _, _, whisper_model, _ = load_models()
             
-            # Faylı mütləq tam yol ilə saxlayırıq
-            temp_path = os.path.join(os.getcwd(), "temp_audio.wav")
+            # Use a fixed path in the current directory
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            temp_path = os.path.join(current_dir, "temp_recording.wav")
+            
             with open(temp_path, "wb") as f:
                 f.write(audio.getbuffer())
             
-            try:
-                # Transcribe funksiyasına tam yolu veririk
-                result = whisper_model.transcribe(temp_path)
-                st.session_state.final_text = result["text"]
-                st.info(f"Detected Text: {st.session_state.final_text}")
-            except Exception as e:
-                st.error(f"Whisper Error: {e}")
-            finally:
-                if os.path.exists(temp_path):
+            if os.path.exists(temp_path):
+                try:
+                    with st.spinner("Processing audio..."):
+                        result = whisper_model.transcribe(temp_path)
+                        st.session_state.final_text = result["text"]
+                        st.info(f"Detected: {st.session_state.final_text}")
+                except Exception as e:
+                    st.error(f"Whisper Error: {e}")
+                finally:
                     os.remove(temp_path)
 
     if st.button("Restart"):
