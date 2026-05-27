@@ -21,16 +21,14 @@ ASSETS = {
 def send_to_telegram(text, lang, score):
     token = st.secrets.get("TG_TOKEN")
     chat_id = st.secrets.get("TG_CHAT_ID")
-    
     if token and chat_id:
-        level = min(int(score * 5) + 1, 5)
-        message = f"New Entry:\nText: {text}\nLanguage: {lang}\nScore: {score:.2f}\nLevel: {level}"
+        message = (f"New Entry\n"
+                   f"Text: {text}\n"
+                   f"Lang: {lang}\n"
+                   f"Score: {score:.2f}")
         url = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={message}"
-        try:
-            requests.get(url)
-        except:
-            pass
-
+        requests.get(url)
+        
 @st.cache_resource
 def load_models():
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -99,26 +97,48 @@ elif st.session_state.step == 2:
             st.error("No input provided")
 
     if st.session_state.method == "Voice":
+        # DuplicateID xətası olmasın deyə key əlavə etdik
         audio = st.audio_input("Record your voice", key="voice_recorder")
+        
         if audio:
-            _, _, whisper_model, _ = load_models()
+            tokenizer, model, whisper_model, device = load_models()
             
-            # Use a fixed path in the current directory
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            temp_path = os.path.join(current_dir, "temp_recording.wav")
-            
+            # Səsi müvəqqəti fayla yazmaq
+            temp_path = "temp_recording.wav"
             with open(temp_path, "wb") as f:
                 f.write(audio.getbuffer())
             
-            if os.path.exists(temp_path):
-                try:
-                    with st.spinner("Processing audio..."):
-                        result = whisper_model.transcribe(temp_path)
-                        st.session_state.final_text = result["text"]
-                        st.info(f"Detected: {st.session_state.final_text}")
-                except Exception as e:
-                    st.error(f"Whisper Error: {e}")
-                finally:
+            try:
+                with st.spinner("Converting voice to text..."):
+                    # 1. Səsi mətnə çevir
+                    result = whisper_model.transcribe(temp_path)
+                    st.session_state.final_text = result["text"]
+                    st.info(f"Detected Text: {st.session_state.final_text}")
+                
+                # 2. Mətn boş deyilsə, dərhal analiz et
+                if st.session_state.final_text.strip():
+                    process_text = st.session_state.final_text
+                    
+                    # Azerbaijani üçün tərcümə
+                    if st.session_state.input_lang == "Azerbaijani":
+                        process_text = GoogleTranslator(source='az', target='en').translate(process_text)
+                    
+                    # Analiz (BERT)
+                    inputs = tokenizer(process_text, return_tensors="pt", truncation=True, padding=True).to(device)
+                    with torch.no_grad():
+                        logits = model(**inputs).logits
+                        probs = F.softmax(logits, dim=-1)
+                        st.session_state.score = probs[0][1].item()
+                        st.session_state.analyzed = True
+                    
+                    # 3. Avtomatik Telegram-a göndər (Həm mətni, həm balı)
+                    send_to_telegram(st.session_state.final_text, st.session_state.input_lang, st.session_state.score)
+                    st.success("Analysis complete and sent to Telegram!")
+                    
+            except Exception as e:
+                st.error(f"Error during processing: {e}")
+            finally:
+                if os.path.exists(temp_path):
                     os.remove(temp_path)
 
     if st.button("Restart"):
