@@ -9,9 +9,10 @@ from transformers import AutoModelForSequenceClassification, BertTokenizer
 from deep_translator import GoogleTranslator
 import requests
 
-# 1. Configuration
+# Page Config
 st.set_page_config(page_title="Humor Analyzer", layout="centered")
 
+# Assets
 ASSETS = {
     "GIF": {
         "level1": "memes/meme1.gif",
@@ -29,38 +30,18 @@ ASSETS = {
     }
 }
 
-def send_to_telegram(text, lang, score):
+def send_to_telegram(text, score_100):
     token = st.secrets.get("TG_TOKEN")
     chat_id = st.secrets.get("TG_CHAT_ID")
-    
-    if not token or not chat_id:
-        st.warning("Telegram secrets tapılmadı!")
-        return
-
-    # Mesajın formatını daha səliqəli edək
-    message = (
-        "🤖 *New Humor Analysis*\n\n"
-        f"📝 *Text:* {text}\n"
-        f"🌐 *Lang:* {lang}\n"
-        f"📊 *Score:* {score:.2f}"
-    )
-    
-    # URL-i düzgün formatda hazırlayaq
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    params = {
-        "chat_id": chat_id,
-        "text": message,
-        "parse_mode": "Markdown" # Mesajın qalın görünməsi üçün
-    }
-    
-    try:
-        r = requests.get(url, params=params)
-        if r.status_code == 200:
-            st.toast("✅ Telegram-a göndərildi!")
-        else:
-            st.error(f"Telegram xətası: {r.status_code}")
-    except Exception as e:
-        st.error(f"Bağlantı xətası: {e}")
+    if token and chat_id:
+        message = (f"New Analysis\n\n"
+                   f"Text: {text}\n"
+                   f"Humor Score: {score_100}/100")
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        try:
+            requests.post(url, json={"chat_id": chat_id, "text": message})
+        except:
+            pass
 
 @st.cache_resource
 def load_models():
@@ -71,88 +52,75 @@ def load_models():
     whisper_model = whisper.load_model("base", device=device)
     return tokenizer, model, whisper_model, device
 
-# 2. Session State
+# Session State
 if 'step' not in st.session_state: st.session_state.step = 1
 if 'final_text' not in st.session_state: st.session_state.final_text = ""
-if 'score' not in st.session_state: st.session_state.score = 0.0
+if 'score_100' not in st.session_state: st.session_state.score_100 = 0
 if 'analyzed' not in st.session_state: st.session_state.analyzed = False
 
-# 3. Step 1: Settings
+# UI Logic
 if st.session_state.step == 1:
     st.title("Humor Analyzer")
-    input_lang = st.selectbox("Input Language", ["English", "Azerbaijani"])
+    # Dil seçimi ləğv edildi, birbaşa English olaraq qeyd olundu
     method = st.radio("Input Method", ["Text", "Voice"])
     style = st.selectbox("Output Style", ["GIF", "Photo", "Number Only"])
     
     if st.button("Continue"):
-        st.session_state.update({"input_lang": input_lang, "method": method, "style": style, "step": 2})
+        st.session_state.update({"input_lang": "English", "method": method, "style": style, "step": 2})
         st.rerun()
 
-# 4. Step 2: Analysis
 elif st.session_state.step == 2:
     st.subheader("Analysis Panel")
     tokenizer, model, whisper_model, device = load_models()
 
-    # INPUT SECTION
     if st.session_state.method == "Voice":
         audio = st.audio_input("Record your voice", key="voice_recorder")
         if audio:
-            temp_path = "temp_recording.wav"
-            with open(temp_path, "wb") as f:
+            with open("temp_audio.wav", "wb") as f:
                 f.write(audio.getbuffer())
-            
-            with st.spinner("Converting voice to text..."):
-                result = whisper_model.transcribe(temp_path)
+            with st.spinner("Processing voice..."):
+                result = whisper_model.transcribe("temp_audio.wav")
                 st.session_state.final_text = result["text"]
-            
-            if os.path.exists(temp_path): os.remove(temp_path)
+            if os.path.exists("temp_audio.wav"):
+                os.remove("temp_audio.wav")
             st.info(f"Detected Text: {st.session_state.final_text}")
     else:
-        st.session_state.final_text = st.text_area("Enter your text here:")
+        st.session_state.final_text = st.text_area("Enter text")
 
-    # ANALYSIS LOGIC
     if st.button("Analyze"):
         if st.session_state.final_text.strip():
             text_to_process = st.session_state.final_text
             
-            if st.session_state.input_lang == "Azerbaijani":
-                text_to_process = GoogleTranslator(source='az', target='en').translate(text_to_process)
-            
             inputs = tokenizer(text_to_process, return_tensors="pt", truncation=True, padding=True).to(device)
             with torch.no_grad():
-                outputs = model(**inputs)
-                logits = outputs.logits
-                
-                probs = F.softmax(logits / 0.5, dim=-1)
-                
+                logits = model(**inputs).logits
+                # 0.6 faktorundan istifadə edərək balları daha kəskin ayırırıq
+                probs = F.softmax(logits / 0.6, dim=-1)
                 raw_score = probs[0][1].item()
                 
-                # Süni şaxələndirmə (Əgər model hələ də tənbəllik edirsə):
-                # Bu, balın 0.10 və 0.90 arasında daha çox oynamasını təmin edir
-                st.session_state.score = raw_score
+                # 0-100 arasına gətirilmə
+                st.session_state.score_100 = int(raw_score * 100)
                 st.session_state.analyzed = True
             
-            # Send result to Telegram
-            send_to_telegram(st.session_state.final_text, st.session_state.input_lang, st.session_state.score)
+            send_to_telegram(st.session_state.final_text, st.session_state.score_100)
         else:
-            st.error("Please provide input first.")
+            st.error("No input provided")
 
-    # RESULTS DISPLAY
     if st.session_state.analyzed:
-        st.divider()
-        score = st.session_state.score
-        level = min(int(score * 5) + 1, 5)
-        
-        st.write(f"### Score: {score:.2f}")
+        score = st.session_state.score_100
+        st.markdown(f"### Humor Score: {score}/100")
         
         if st.session_state.style != "Number Only":
+            level = min(max(int(score / 20) + 1, 1), 5)
             asset_type = "GIF" if st.session_state.style == "GIF" else "IMAGE"
             path = ASSETS[asset_type][f"level{level}"]
+            
             if os.path.exists(path):
                 st.image(path)
             else:
-                st.warning("Meme asset not found.")
+                st.warning(f"Resource not found: {path}")
 
     if st.button("Restart"):
-        for key in list(st.session_state.keys()): del st.session_state[key]
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
         st.rerun()
