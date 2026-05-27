@@ -1,0 +1,8 @@
+streamlit
+torch
+transformers
+openai-whisper
+deep-translator
+pandas
+python-dotenv
+requests

@@ -1,0 +1,179 @@
+import streamlit as st
+import os
+import torch
+import torch.nn.functional as F
+import whisper
+import pandas as pd
+from datetime import datetime
+from transformers import AutoModelForSequenceClassification, BertTokenizer
+from deep_translator import GoogleTranslator
+import requests
+
+import os
+from dotenv import load_dotenv
+
+# Faylın yuxarısında .env faylını oxu
+load_dotenv()
+
+def send_to_telegram(text, lang):
+    if lang == "Azerbaijani":
+        token = os.getenv("TG_TOKEN")
+        chat_id = os.getenv("TG_CHAT_ID")
+        
+        if not token or not chat_id:
+            return # Token tapılmasa xəta verməsin
+
+        message = f"🇦🇿 New Entry:\n{text}"
+        url = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={message}"
+        try:
+            requests.get(url)
+        except:
+            pass
+
+# --- CONFIGURATION & ASSETS ---
+st.set_page_config(page_title="Are You Joking?", layout="centered")
+
+# Assets Dictionary - Fill these with your paths or URLs
+ASSETS = {
+    "GIF": {
+        "level1": "memes/meme1.gif",
+        "level2": "memes/meme2.gif",
+        "level3": "memes/meme3.gif",
+        "level4": "memes/meme4.gif",
+        "level5": "memes/meme5.gif"
+    },
+    "IMAGE": {
+        "level1": "memes/meme1.jpg",
+        "level2": "memes/meme2.jpg",
+        "level3": "memes/meme3.jpg",
+        "level4": "memes/meme4.jpg",
+        "level5": "memes/meme5.webp"
+    }
+}
+
+# Minimalist UI Design
+st.markdown("""
+    <style>
+    .stButton>button { width: 100%; border-radius: 0px; height: 3em; background-color: #fcfcfc; border: 1px solid #e0e0e0; }
+    .stTextArea>div>div>textarea { border-radius: 0px; }
+    .result-card { border: 1px solid #f0f0f0; padding: 20px; background-color: #fafafa; text-align: center; }
+    .number-display { font-size: 72px; font-weight: bold; color: #333; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- STATE MANAGEMENT ---
+if 'step' not in st.session_state:
+    st.session_state.step = 1
+if 'final_text' not in st.session_state:
+    st.session_state.final_text = ""
+if 'analyzed' not in st.session_state:
+    st.session_state.analyzed = False
+
+# --- FUNCTIONS ---
+@st.cache_resource
+def load_models():
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model_path = "bert-base-multilingual-cased" 
+    
+    tokenizer = BertTokenizer.from_pretrained(model_path)
+    model = AutoModelForSequenceClassification.from_pretrained(model_path).to(device)
+    whisper_model = whisper.load_model("base", device=device)
+    return tokenizer, model, whisper_model, device
+
+def save_to_database(text, lang, label):
+    file_path = 'collected_data.csv'
+    new_data = pd.DataFrame([[datetime.now(), text, lang, label]], 
+                            columns=['Timestamp', 'Text', 'Language', 'Is_Joke'])
+    if not os.path.isfile(file_path):
+        new_data.to_csv(file_path, index=False)
+    else:
+        new_data.to_csv(file_path, mode='a', header=False, index=False)
+
+# --- STEP 1: CONFIGURATION ---
+if st.session_state.step == 1:
+    st.title("Are You Joking?")
+    input_lang = st.selectbox("Input Language", ["English", "Azerbaijani"])
+    method = st.radio("Input Method", ["Text", "Voice"])
+    # New judging method selection
+    judging_style = st.selectbox("Output Style", ["GIF", "Photo", "Number Only"])
+    
+    if st.button("Continue"):
+        st.session_state.update({
+            "input_lang": input_lang,
+            "method": method,
+            "judging_style": judging_style,
+            "step": 2
+        })
+        st.rerun()
+
+# --- STEP 2: ANALYSIS ---
+elif st.session_state.step == 2:
+    st.subheader("Analysis Panel")
+    
+    if st.session_state.method == "Voice":
+        audio = st.audio_input("Record")
+        if audio:
+            _, _, whisper_model, _ = load_models()
+            with open("temp.wav", "wb") as f: f.write(audio.getbuffer())
+            st.session_state.final_text = whisper_model.transcribe("temp.wav")["text"]
+            st.info(f"Detected: {st.session_state.final_text}")
+            os.remove("temp.wav")
+    else:
+        st.session_state.final_text = st.text_area("Input Content")
+
+    if st.button("Analyze"):
+        if st.session_state.final_text:
+            tokenizer, model, _, device = load_models()
+            process_text = st.session_state.final_text
+            if st.session_state.input_lang == "Azerbaijani":
+                process_text = GoogleTranslator(source='az', target='en').translate(process_text)
+            
+            inputs = tokenizer(process_text, return_tensors="pt", truncation=True, padding=True, max_length=64).to(device)
+            with torch.no_grad():
+                logits = model(**inputs).logits
+                probs = F.softmax(logits / 3.0, dim=-1)
+                st.session_state.score = probs[0][1].item()
+                st.session_state.analyzed = True
+        else:
+            st.error("Missing input")
+
+    if st.session_state.analyzed:
+        score = st.session_state.score
+        style = st.session_state.judging_style
+        level = min(int(score * 5) + 1, 5)
+        
+        st.write("---")
+        with st.container(border=True):
+            if style == "Number Only":
+                st.markdown(f"<div class='number-display'>{score:.2f}</div>", unsafe_allow_html=True)
+                st.write(f"Level {level}")
+            
+            elif style == "GIF":
+                path = ASSETS["GIF"][f"level{level}"]
+                if os.path.exists(path):
+                    st.image(path, use_container_width=True)
+                else:
+                    st.warning(f"GIF Level {level} missing at {path}")
+                st.write(f"Score: {score:.2f}")
+
+            elif style == "Photo":
+                path = ASSETS["IMAGE"][f"level{level}"]
+                if os.path.exists(path):
+                    st.image(path, use_container_width=True)
+                else:
+                    st.warning(f"Image Level {level} missing at {path}")
+                st.write(f"Score: {score:.2f}")
+
+        # Database Section
+        st.caption("Database contribution:")
+        c1, c2 = st.columns(2)
+        if c1.button("Mark as Joke"):
+            save_to_database(st.session_state.final_text, st.session_state.input_lang, 1)
+            st.toast("Saved!")
+        if c2.button("Mark as Serious"):
+            save_to_database(st.session_state.final_text, st.session_state.input_lang, 0)
+            st.toast("Saved!")
+
+    if st.button("Restart"):
+        for key in list(st.session_state.keys()): del st.session_state[key]
+        st.rerun()
