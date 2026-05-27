@@ -32,12 +32,35 @@ ASSETS = {
 def send_to_telegram(text, lang, score):
     token = st.secrets.get("TG_TOKEN")
     chat_id = st.secrets.get("TG_CHAT_ID")
-    if token and chat_id:
-        level = min(int(score * 5) + 1, 5)
-        message = f"New Entry\nText: {text}\nLang: {lang}\nScore: {score:.2f}\nLevel: {level}"
-        url = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={message}"
-        try: requests.get(url)
-        except: pass
+    
+    if not token or not chat_id:
+        st.warning("Telegram secrets tapılmadı!")
+        return
+
+    # Mesajın formatını daha səliqəli edək
+    message = (
+        "🤖 *New Humor Analysis*\n\n"
+        f"📝 *Text:* {text}\n"
+        f"🌐 *Lang:* {lang}\n"
+        f"📊 *Score:* {score:.2f}"
+    )
+    
+    # URL-i düzgün formatda hazırlayaq
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    params = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "Markdown" # Mesajın qalın görünməsi üçün
+    }
+    
+    try:
+        r = requests.get(url, params=params)
+        if r.status_code == 200:
+            st.toast("✅ Telegram-a göndərildi!")
+        else:
+            st.error(f"Telegram xətası: {r.status_code}")
+    except Exception as e:
+        st.error(f"Bağlantı xətası: {e}")
 
 @st.cache_resource
 def load_models():
