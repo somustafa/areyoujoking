@@ -18,7 +18,7 @@ To make the model "understand" humor, we processed a massive hybrid dataset:
 * **Scrambled Data:** Randomized sentences to help the model distinguish between structure and gibberish.
 
 ### 2. Why BERT?
-We used **`bert-base-multilingual-cased`** because:
+I used **`bert-base-multilingual-cased`** because:
 * **Contextual Awareness:** Unlike older models, BERT reads sentences in both directions, catching the relationship between a setup and a punchline.
 * **Multilingual Support:** It provides a foundation for understanding multiple languages, including Azerbaijani and English.
 * **Fine-tuning:** We froze the base layers and trained the head specifically on humor detection.
