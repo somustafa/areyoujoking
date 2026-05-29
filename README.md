@@ -1,4 +1,4 @@
-# 🤖 Was That a Joke?! (Humor Scaler)
+# Was That a Joke?!
 
 **Was That a Joke?!** is an AI-powered application designed to analyze the "humor level" of any given text or voice input. Instead of a boring "Yes/No" classification, this project uses a fine-tuned Transformer model to judge and score jokes on a scale of 0 to 100, providing visual feedback through memes and real-time notifications via Telegram.
 
@@ -63,5 +63,10 @@ We used **`bert-base-multilingual-cased`** because:
 └── README.md           # Project documentation
 
 ![App Preview](ss1.jpeg)
-![Humor Spectrum](ss2.jpeg)
-![Telegram Notification](ss3.jpeg)
+!(ss2.jpeg)
+!(ss3.jpeg)
+!(ss4.jpeg)
+!(ss5.jpeg)
+!(ss6.jpeg)
+!(ss7.jpeg)
+!(ss8.jpeg)
