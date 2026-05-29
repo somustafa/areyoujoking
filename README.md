@@ -54,14 +54,6 @@ We used **`bert-base-multilingual-cased`** because:
     * **Level 4-5 (60-100):** Peak Comedy (Celebratory memes).
 
 ---
-
-##  Project Structure
-```text
-├── app.py              # Main Streamlit application
-├── requirements.txt    # Python dependencies
-├── memes/              # Visual assets (GIFs/Images)
-└── README.md           # Project documentation
-
 ![App Preview](ss1.jpeg)
 !(ss2.jpeg)
 !(ss3.jpeg)
@@ -70,3 +62,12 @@ We used **`bert-base-multilingual-cased`** because:
 !(ss6.jpeg)
 !(ss7.jpeg)
 !(ss8.jpeg)
+
+
+##  Project Structure
+```text
+├── app.py              # Main Streamlit application
+├── requirements.txt    # Python dependencies
+├── memes/              # Visual assets (GIFs/Images)
+└── README.md           # Project documentation
+
