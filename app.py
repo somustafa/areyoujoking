@@ -9,6 +9,21 @@ from transformers import AutoModelForSequenceClassification, BertTokenizer
 from deep_translator import GoogleTranslator
 import requests
 
+import gdown
+import zipfile
+
+@st.cache_resource
+def load_models():
+    # Məsələn, istifadəçi adın 'sona' və modelin adı 'humor-analyzer'dırsa:
+    model_path = "sonaamus/areyoujoking" 
+    
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    tokenizer = BertTokenizer.from_pretrained(model_path)
+    model = AutoModelForSequenceClassification.from_pretrained(model_path).to(device)
+    whisper_model = whisper.load_model("base", device=device)
+    
+    return tokenizer, model, whisper_model, device
+
 # Page Config
 st.set_page_config(page_title="Humor Analyzer", layout="centered")
 
