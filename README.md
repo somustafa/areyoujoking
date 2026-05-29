@@ -55,13 +55,13 @@ We used **`bert-base-multilingual-cased`** because:
 
 ---
 ![App Preview](ss1.jpeg)
-!(ss2.jpeg)
-!(ss3.jpeg)
-!(ss4.jpeg)
-!(ss5.jpeg)
-!(ss6.jpeg)
-!(ss7.jpeg)
-!(ss8.jpeg)
+![Output Style](ss2.jpeg)
+![Output with text](ss3.jpeg)
+![Output with text](ss4.jpeg)
+![Output with text](ss5.jpeg)
+![Output with audio](ss6.jpeg)
+![Output with aoudio](ss7.jpeg)
+![Telegram bot screenshot](ss8.jpeg)
 
 
 ##  Project Structure
